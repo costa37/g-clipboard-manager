@@ -1,0 +1,8 @@
+.build/
+dist/
+.DS_Store
+Signing/
+*.p12
+*.pfx
+*.pem
+.env
