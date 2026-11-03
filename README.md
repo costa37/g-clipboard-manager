@@ -2,6 +2,22 @@
 
 A native, keyboard-friendly macOS clipboard manager for personal use. **Apple Silicon (M1 or newer), macOS 13+.** Current version: **0.3.8**.
 
+## Screenshots
+
+### Text editing
+
+Edit a saved text clip and copy it as a new entry while preserving the original.
+
+![G-Clip text editing with sample clipboard history](docs/screenshots/text-editing.png)
+
+### Image editing
+
+Add arrows, rectangles, and text annotations, with zoom and pan controls.
+
+![G-Clip image editing with sample annotations](docs/screenshots/image-editing.png)
+
+Screenshots use synthetic sample content.
+
 ## Install
 
 1. Download `G-Clip-0.3.8-arm64.zip` from [Releases](https://github.com/costa37/g-clipboard-manager/releases).
