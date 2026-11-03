@@ -1,10 +1,10 @@
 # G-Clip
 
-A native, keyboard-friendly macOS clipboard manager for personal use. **Apple Silicon (M1 or newer), macOS 13+.** Current version: **0.3.7**.
+A native, keyboard-friendly macOS clipboard manager for personal use. **Apple Silicon (M1 or newer), macOS 13+.** Current version: **0.3.8**.
 
 ## Install
 
-1. Download `G-Clip-0.3.7-arm64.zip` from [Releases](https://github.com/costa37/g-clipboard-manager/releases).
+1. Download `G-Clip-0.3.8-arm64.zip` from [Releases](https://github.com/costa37/g-clipboard-manager/releases).
 2. Unzip it and drag **G-Clip.app** into **Applications**. Quit any older G-Clip before replacing it.
 3. Open the app. This personal build is ad-hoc signed and is **not Apple-notarized**. If macOS blocks it, review the message in System Settings → Privacy & Security and use **Open Anyway** only if you trust this download. Managed Macs may prohibit it.
 4. For automatic pasting, grant G-Clip access in System Settings → Privacy & Security → Accessibility. New ad-hoc builds may require granting this again.
@@ -35,7 +35,9 @@ Install Xcode Command Line Tools, then run:
 
 ```sh
 bash scripts/build.sh
-.build/release/GClip --self-test
+CONFIGURATION=debug bash scripts/build.sh
+.build/debug/GClip --self-test
+bash scripts/build.sh
 bash scripts/package.sh
 ```
 

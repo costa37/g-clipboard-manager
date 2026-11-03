@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.8 — More reliable clipboard capture
+
+- Retry clipboard data that is not yet available; reject reads spanning two clipboard generations.
+- Poll every 150 ms in common run-loop modes, including menu tracking, and capture immediately before opening history or replacing the clipboard.
+- Store one image representation; compress oversized TIFF to PNG when possible instead of summing redundant PNG/TIFF bytes.
+- Accept JPEG, HEIC, GIF (static frame), BMP, and URL-only clipboard representations.
+- Stage clipboard writes together and check success before closing the editor or attempting paste.
+- Retain privacy exclusions and the 10 MB per-clip limit. Copies overwritten between polls cannot be recovered.
+- Debug regression suite covers delayed text/image availability, generation races, consecutive copies, privacy markers, JPEG conversion, URL-only copies, redundant image payloads, and plain/rich/image writes.
+
+
 ## 0.2.10 keyboard filters
 
 While browsing, Tab cycles All → Text → Images → All; Shift+Tab reverses. The active filter appears beside search with a Tab hint. Search stays focused, and the query is preserved when switching categories. ↑/↓ and Return operate only on matching entries. Image queries match source app names; OCR is not included. Opening G-Clip resets to All and clears the query. Tab in the editor remains normal text/control navigation.
