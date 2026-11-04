@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.11 — Clearer Save icon
+
+Both text and image editors now show a checkmark beside Save. The Command-S shortcut and save behavior are unchanged.
+
+
+## 0.3.10 — Main display preference
+
+Added a persistent, enabled-by-default “Always open on main display” menu option. Uses the macOS primary display rather than the keyboard-focused display. Disable it to open under the pointer. Existing elevated placement, saved size, and manual dragging are preserved.
+
+
 ## 0.3.9 — Save edited clips
 
 Text and image editors now use Save and Command-S to create a new history entry, preserve the original, and place the result on the clipboard. Command-C is no longer intercepted for saving and remains available for normal text copying. Updated editor labels, tooltips, and shortcut hints.
