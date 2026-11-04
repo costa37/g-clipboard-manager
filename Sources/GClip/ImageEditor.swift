@@ -200,7 +200,7 @@ struct ImageEditor: View {
                 Spacer(minLength: 0)
                 Button { draft.undo() } label: { Image(systemName: "arrow.uturn.backward").font(.system(size: 17, weight: .medium)).frame(width: 32, height: 32) }.disabled(draft.history.isEmpty).help("Undo (⌘Z)").accessibilityLabel("Undo")
                 Button { draft.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 17, weight: .medium)).frame(width: 32, height: 32) }.help("Reset to original image").accessibilityLabel("Reset image")
-                Button(action: save) { Label("Save", systemImage: "square.and.arrow.down") }.buttonStyle(.borderedProminent).help("Save edited image as a new item (⌘S)")
+                Button(action: save) { Label("Save", systemImage: "checkmark") }.buttonStyle(.borderedProminent).help("Save edited image as a new item (⌘S)")
             }.buttonStyle(ImageControlStyle()).controlSize(.regular).font(.system(size: 13)).padding(.horizontal, 8).padding(.vertical, 6)
             Divider()
             ImageCanvas(draft: draft).frame(maxWidth: .infinity, maxHeight: .infinity)

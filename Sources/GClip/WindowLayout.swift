@@ -1,6 +1,10 @@
 import AppKit
 
 enum WindowLayout {
+    static func openingScreenIndex(frames: [CGRect], pointer: CGPoint, preferPrimary: Bool) -> Int? {
+        guard !frames.isEmpty else { return nil }
+        return preferPrimary ? 0 : (frames.firstIndex(where: { $0.contains(pointer) }) ?? 0)
+    }
     static let maximumDefault = CGSize(width: 1500, height: 890)
     static let preferredMinimum = CGSize(width: 980, height: 540)
     static func area(_ visible: CGRect) -> CGRect {

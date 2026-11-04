@@ -416,7 +416,7 @@ struct Content: View {
                             HStack {
                                 Button { store.editing = nil } label: { Label("Back", systemImage: "chevron.left") }.help("Back to preview (Escape)")
                                 Spacer()
-                                Button { store.saveEdited() } label: { Label("Save", systemImage: "square.and.arrow.down") }.buttonStyle(.borderedProminent).help("Save as a new formatted item (⌘S)")
+                                Button { store.saveEdited() } label: { Label("Save", systemImage: "checkmark") }.buttonStyle(.borderedProminent).help("Save as a new formatted item (⌘S)")
                             }.controlSize(.small).padding(8)
                             Divider()
                             RichEditor(value: $store.draft, textScale: store.textScale)
@@ -474,6 +474,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var screenObserver: NSObjectProtocol?
     var fittingWindow = false
     var preferredWindowSize: CGSize?
+    var alwaysOpenOnMainDisplay: Bool {
+        get { UserDefaults.standard.object(forKey: "alwaysOpenOnMainDisplay") as? Bool ?? true }
+        set { if !CommandLine.arguments.contains("--preview") { UserDefaults.standard.set(newValue, forKey: "alwaysOpenOnMainDisplay") } }
+    }
     var hotkeyLabel = "⌥⌘Space"
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -497,7 +501,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if !self.panel.isVisible { self.rememberDestination(notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication) }
         }
         screenObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-            guard let self, self.panel.isVisible else { return }; self.fitWindow(center: false, usePreferred: false)
+            guard let self, self.panel.isVisible else { return }; self.fitWindow(center: self.alwaysOpenOnMainDisplay, usePreferred: false)
         }
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         status.button?.image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "G-Clip")
@@ -550,8 +554,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func fitWindow(center: Bool, usePreferred: Bool) {
         guard !fittingWindow else { return }; fittingWindow = true; defer { fittingWindow = false }
-        let pointerScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
-        guard let screen = (center ? pointerScreen : panel.screen) ?? NSScreen.main ?? NSScreen.screens.first else { return }
+        let screens = NSScreen.screens
+        // The first screen is the configured primary display; NSScreen.main follows keyboard focus.
+        let openingIndex = WindowLayout.openingScreenIndex(frames: screens.map(\.frame), pointer: NSEvent.mouseLocation, preferPrimary: alwaysOpenOnMainDisplay)
+        let openingScreen = openingIndex.map { screens[$0] }
+        guard let screen = (center ? openingScreen : panel.screen) ?? screens.first else { return }
         let visible = screen.visibleFrame
         let minimum = WindowLayout.minimum(in: visible)
         store.windowMinimum = minimum
@@ -635,6 +642,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let fontMenu = submenu("Font size")
         let control = NSMenuItem(); control.view = MenuTypographyView(store: store)
         fontMenu.addItem(control)
+        let display = action(menu, "Always open on main display", #selector(toggleMainDisplay))
+        display.state = alwaysOpenOnMainDisplay ? .on : .off
+        display.toolTip = "Open on the main display configured in macOS. Turn off to use the display under the pointer."
         menu.addItem(.separator())
 
         let shortcuts = submenu("Keyboard shortcut")
@@ -649,6 +659,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(.separator())
         _ = action(menu, "Quit G-Clip", #selector(quit), key: "q")
         status.menu = menu; status.button?.performClick(nil); status.menu = nil
+    }
+    @objc func toggleMainDisplay() {
+        alwaysOpenOnMainDisplay.toggle()
+        if panel.isVisible { fitWindow(center: true, usePreferred: true) }
     }
     @objc func setTheme(_ sender: NSMenuItem) { store.theme = sender.representedObject as! String; UserDefaults.standard.set(store.theme, forKey: "theme") }
     func configureLogin() {
@@ -755,6 +769,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
 if CommandLine.arguments.contains("--self-test") {
     ClipboardIOTests.run()
+    let displayFrames = [CGRect(x: 0, y: 0, width: 1440, height: 900), CGRect(x: -1920, y: 0, width: 1920, height: 1080)]
+    assert(WindowLayout.openingScreenIndex(frames: displayFrames, pointer: CGPoint(x: -500, y: 400), preferPrimary: true) == 0)
+    assert(WindowLayout.openingScreenIndex(frames: displayFrames, pointer: CGPoint(x: -500, y: 400), preferPrimary: false) == 1)
+    assert(WindowLayout.openingScreenIndex(frames: displayFrames, pointer: CGPoint(x: 9000, y: 0), preferPrimary: false) == 0)
+    assert(WindowLayout.openingScreenIndex(frames: [], pointer: .zero, preferPrimary: true) == nil)
     let largeDisplay = CGRect(x: 0, y: 0, width: 2560, height: 1400)
     assert(WindowLayout.size(in: largeDisplay, preferred: nil) == CGSize(width: 1500, height: 890))
     let laptop = CGRect(x: 0, y: 40, width: 1440, height: 820)
