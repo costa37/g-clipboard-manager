@@ -167,7 +167,7 @@ struct ImageEditor: View {
     private var controlColor: Color { scheme == .dark ? Color(white: 0.95) : Color(white: 0.12) }
     @ObservedObject var draft: ImageDraft
     var back: () -> Void
-    var copy: () -> Void
+    var save: () -> Void
     private func symbol(_ tool: ImageTool) -> String {
         switch tool { case .arrow: return "arrow.up.right"; case .rectangle: return "rectangle"; case .text: return "textformat"; case .crop: return "crop" }
     }
@@ -200,7 +200,7 @@ struct ImageEditor: View {
                 Spacer(minLength: 0)
                 Button { draft.undo() } label: { Image(systemName: "arrow.uturn.backward").font(.system(size: 17, weight: .medium)).frame(width: 32, height: 32) }.disabled(draft.history.isEmpty).help("Undo (⌘Z)").accessibilityLabel("Undo")
                 Button { draft.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 17, weight: .medium)).frame(width: 32, height: 32) }.help("Reset to original image").accessibilityLabel("Reset image")
-                Button(action: copy) { Label("Copy", systemImage: "doc.on.doc") }.buttonStyle(.borderedProminent).help("Copy edited image as a new item (⌘C)")
+                Button(action: save) { Label("Save", systemImage: "square.and.arrow.down") }.buttonStyle(.borderedProminent).help("Save edited image as a new item (⌘S)")
             }.buttonStyle(ImageControlStyle()).controlSize(.regular).font(.system(size: 13)).padding(.horizontal, 8).padding(.vertical, 6)
             Divider()
             ImageCanvas(draft: draft).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -223,7 +223,7 @@ struct ImageStatus: View {
 struct ImageEditHint: View {
     @ObservedObject var draft: ImageDraft
     var body: some View {
-        Text(draft.error.isEmpty ? "Drag to draw · Click to edit · Delete removes · ⌘C Copy" : draft.error)
+        Text(draft.error.isEmpty ? "Drag to draw · Click to edit · Delete removes · ⌘S Save" : draft.error)
             .foregroundStyle(draft.error.isEmpty ? Color.secondary : Color.red)
             .lineLimit(1).help(draft.error)
     }

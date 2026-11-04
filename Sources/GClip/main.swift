@@ -205,19 +205,19 @@ final class Store: ObservableObject {
     }
     func select(_ item: Clip) { if editing?.isImage == true && item.isImage { if editing?.id != item.id { edit(item) }; return }; editing = nil; selected = item.id }
     func edit(_ item: Clip) { message = ""; selected = item.id; imageEditorLoader.select(item.isImage ? item : nil); draft = item.attributed; editing = item }
-    func copyEdited() {
+    func saveEdited() {
         guard var item = editing else { return }
         item.id = UUID()
         if item.isImage {
             guard let image = imageDraft.export(), let png = ImageRenderer.png(image) else { message = "Could not export the edited image."; return }
-            guard png.count <= 10 * 1024 * 1024 else { message = "Edited image exceeds 10 MB. Crop it before copying."; return }
+            guard png.count <= 10 * 1024 * 1024 else { message = "Edited image exceeds 10 MB. Crop it before saving."; return }
             item.data = [NSPasteboard.PasteboardType.png.rawValue: png]; item.text = ""
         } else {
             item.text = draft.string
             item.data = [NSPasteboard.PasteboardType.string.rawValue: Data(item.text.utf8)]
             if let rtf = try? draft.data(from: NSRange(location: 0, length: draft.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]) { item.data[NSPasteboard.PasteboardType.rtf.rawValue] = rtf }
         }
-        guard copy(item, rich: true, addition: true) else { return }; editing = nil; query = ""; message = "Saved a new copy. Original preserved."
+        guard copy(item, rich: true, addition: true) else { return }; editing = nil; query = ""; message = "Saved a new item. Original preserved."
     }
     func move(_ delta: Int) {
         guard !filtered.isEmpty else { return }
@@ -410,13 +410,13 @@ struct Content: View {
                     }
                 if let item = store.editing {
                     if item.isImage {
-                        ImageEditor(draft: store.imageDraft, back: { store.editing = nil }, copy: { store.copyEdited() })
+                        ImageEditor(draft: store.imageDraft, back: { store.editing = nil }, save: { store.saveEdited() })
                     } else {
                         VStack(spacing: 0) {
                             HStack {
                                 Button { store.editing = nil } label: { Label("Back", systemImage: "chevron.left") }.help("Back to preview (Escape)")
                                 Spacer()
-                                Button { store.copyEdited() } label: { Label("Copy", systemImage: "doc.on.doc") }.buttonStyle(.borderedProminent).help("Save a new formatted copy (⌘C)")
+                                Button { store.saveEdited() } label: { Label("Save", systemImage: "square.and.arrow.down") }.buttonStyle(.borderedProminent).help("Save as a new formatted item (⌘S)")
                             }.controlSize(.small).padding(8)
                             Divider()
                             RichEditor(value: $store.draft, textScale: store.textScale)
@@ -442,7 +442,7 @@ struct Content: View {
             Divider()
             HStack {
                 if store.editing?.isImage == true && store.message.isEmpty { ImageEditHint(draft: store.imageDraft) }
-                else { Text(store.message.isEmpty ? (store.editing == nil ? "↑↓ Browse    ↵ Paste    → Edit" : "Esc / ⌘← Back to list    ⌘C Save a new copy") : store.message).lineLimit(1).help(store.message) }
+                else { Text(store.message.isEmpty ? (store.editing == nil ? "↑↓ Browse    ↵ Paste    → Edit" : "Esc / ⌘← Back to list    ⌘S Save as new item") : store.message).lineLimit(1).help(store.message) }
                 Spacer()
                 if store.editing?.isImage == true || store.current?.isImage == true { ImageZoomControls(draft: store.editing?.isImage == true ? store.imageDraft : store.imagePreview.draft) }
                 ImageStatus(draft: store.editing?.isImage == true ? store.imageDraft : store.imagePreview.draft, editing: store.editing?.isImage == true, clip: store.current)
@@ -512,7 +512,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if self.store.editing != nil {
                 if event.keyCode == 123 && flags.contains(.command) { self.store.editing = nil; return nil }
                 if self.store.editing?.isImage == true && flags == .command && event.charactersIgnoringModifiers == "z" { self.store.imageDraft.undo(); return nil }
-                if flags.contains(.command) && event.charactersIgnoringModifiers == "c" { self.store.copyEdited(); return nil }
+                if flags.intersection([.command, .control, .option, .shift]) == .command && event.charactersIgnoringModifiers?.lowercased() == "s" { self.store.saveEdited(); return nil }
                 return event
             }
             if event.keyCode == 48 && flags.intersection([.command, .control, .option]).isEmpty {
