@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.9 — Save edited clips
+
+Text and image editors now use Save and Command-S to create a new history entry, preserve the original, and place the result on the clipboard. Command-C is no longer intercepted for saving and remains available for normal text copying. Updated editor labels, tooltips, and shortcut hints.
+
+
 ## 0.3.8 — More reliable clipboard capture
 
 - Retry clipboard data that is not yet available; reject reads spanning two clipboard generations.
