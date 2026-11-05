@@ -245,13 +245,33 @@ final class MatchingStyleTextView: NSTextView {
     override func paste(_ sender: Any?) { pasteAsPlainText(sender) }
 }
 
+final class WrappingTextScrollView: NSScrollView {
+    override func layout() {
+        super.layout()
+        fitTextToViewport()
+    }
+
+    func fitTextToViewport() {
+        guard let text = documentView as? NSTextView else { return }
+        // Clip-view bounds are in document coordinates, including text magnification.
+        let width = max(1, contentView.bounds.width)
+        if abs(text.frame.width - width) > 0.5 {
+            text.setFrameSize(NSSize(width: width, height: text.frame.height))
+        }
+        text.textContainer?.containerSize = NSSize(
+            width: max(1, width - 2 * text.textContainerInset.width),
+            height: .greatestFiniteMagnitude)
+    }
+}
+
 struct RichEditor: NSViewRepresentable {
     @Binding var value: NSAttributedString
     var editable = true
     var textScale: Double = 1
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView()
+        let scroll = WrappingTextScrollView()
+        scroll.hasHorizontalScroller = false
         scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         let text = MatchingStyleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         text.minSize = .zero; text.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -267,12 +287,14 @@ struct RichEditor: NSViewRepresentable {
         text.drawsBackground = false; scroll.drawsBackground = false
         scroll.minMagnification = 0.85; scroll.maxMagnification = 1.8
         scroll.magnification = textScale
+        scroll.fitTextToViewport()
         if editable { DispatchQueue.main.async { text.window?.makeFirstResponder(text) } }
         return scroll
     }
     func updateNSView(_ view: NSScrollView, context: Context) {
         context.coordinator.parent = self
         if abs(view.magnification - textScale) > 0.001 { view.magnification = textScale }
+        (view as? WrappingTextScrollView)?.fitTextToViewport()
         let text = view.documentView as! NSTextView
         if !text.attributedString().isEqual(to: value) { text.textStorage?.setAttributedString(value) }
     }
@@ -384,7 +406,7 @@ struct Content: View {
                                                 Text(item.isImage ? "Image" : item.text).font(.system(size: 13 * store.textScale, weight: .medium)).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
                                                 HStack { Text(item.source); Text("·"); TimelineView(.periodic(from: .now, by: 60)) { context in Text(ClipAge.label(since: item.date, now: context.date)) } }.font(.system(size: 10 * store.textScale)).foregroundStyle(.secondary)
                                             }
-                                            if item.isRich && !item.isImage { Button { paste(item, true) } label: { Image(systemName: "textformat") }.buttonStyle(.borderless).help("Paste with formatting (⇧⌘V)").accessibilityLabel("Paste with formatting") }
+                                            if item.isRich && !item.isImage { Button { paste(item, true) } label: { Image(systemName: "textformat") }.buttonStyle(.borderless).help("Paste with formatting (⇧↵)").accessibilityLabel("Paste with formatting") }
                                             Button { store.edit(item) } label: { Image(systemName: "chevron.right") }.buttonStyle(.borderless).help("Edit or preview (→)").accessibilityLabel("Edit or preview clip")
                                         }.padding(10).background(store.current?.id == item.id ? selectionColor : Color.clear, in: RoundedRectangle(cornerRadius: 10)).contentShape(Rectangle())
                                             .onTapGesture(count: 2) { paste(item, false) }.onTapGesture { store.select(item) }.id(item.id)
@@ -442,7 +464,7 @@ struct Content: View {
             Divider()
             HStack {
                 if store.editing?.isImage == true && store.message.isEmpty { ImageEditHint(draft: store.imageDraft) }
-                else { Text(store.message.isEmpty ? (store.editing == nil ? "↑↓ Browse    ↵ Paste    → Edit" : "Esc / ⌘← Back to list    ⌘S Save as new item") : store.message).lineLimit(1).help(store.message) }
+                else { Text(store.message.isEmpty ? (store.editing == nil ? "↑↓ Browse    ↵ Paste    ⇧↵ With formatting    → Edit" : "Esc / ⌘← Back to list    ⌘S Save as new item") : store.message).lineLimit(1).help(store.message) }
                 Spacer()
                 if store.editing?.isImage == true || store.current?.isImage == true { ImageZoomControls(draft: store.editing?.isImage == true ? store.imageDraft : store.imagePreview.draft) }
                 ImageStatus(draft: store.editing?.isImage == true ? store.imageDraft : store.imagePreview.draft, editing: store.editing?.isImage == true, clip: store.current)
@@ -522,13 +544,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if event.keyCode == 48 && flags.intersection([.command, .control, .option]).isEmpty {
                 self.store.cycleFilter(backward: flags.contains(.shift)); return nil
             }
-            if flags.contains([.command, .shift]) && event.charactersIgnoringModifiers?.lowercased() == "v" { if let item = self.store.current { self.paste(item, rich: true) }; return nil }
             switch event.keyCode {
             case 125: self.store.move(1); return nil
             case 126: self.store.move(-1); return nil
             case 124: if let item = self.store.current { self.store.edit(item) }; return nil
             case 36, 76:
-                if ClearCommand.isCommand(self.store.query) { self.store.clear() } else if let item = self.store.current { self.paste(item, rich: false) }; return nil
+                if ClearCommand.isCommand(self.store.query) { self.store.clear() } else if let item = self.store.current { self.paste(item, rich: flags.contains(.shift)) }; return nil
             default: return event
             }
         }
@@ -769,6 +790,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
 if CommandLine.arguments.contains("--self-test") {
     ClipboardIOTests.run()
+    let wrapScroll = WrappingTextScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 250))
+    let wrapText = MatchingStyleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 250))
+    wrapText.isHorizontallyResizable = false
+    wrapText.isVerticallyResizable = true
+    wrapText.textContainerInset = NSSize(width: 14, height: 14)
+    wrapText.textContainer?.widthTracksTextView = true
+    wrapScroll.documentView = wrapText
+    wrapScroll.minMagnification = 0.85; wrapScroll.maxMagnification = 1.8
+    for sample in [String(repeating: "Long clipboard text ", count: 100), String(repeating: "abcdefghij", count: 200)] {
+        wrapText.textStorage?.setAttributedString(NSAttributedString(string: sample, attributes: [.font: NSFont.systemFont(ofSize: 15)]))
+        for width: CGFloat in [300, 700, 220] {
+            wrapScroll.setFrameSize(NSSize(width: width, height: 250))
+            for scale: CGFloat in [1, 1.8, 0.85] {
+                wrapScroll.magnification = scale
+                wrapScroll.layoutSubtreeIfNeeded()
+                wrapScroll.fitTextToViewport()
+                let container = wrapText.textContainer!
+                let manager = wrapText.layoutManager!
+                manager.ensureLayout(for: container)
+                assert(abs(wrapText.frame.width - wrapScroll.contentView.bounds.width) < 1)
+                assert(manager.usedRect(for: container).height > 30, "Long text must wrap")
+                assert(manager.usedRect(for: container).width <= container.containerSize.width + 1)
+                assert(wrapText.string == sample, "Wrapping must not insert line breaks")
+            }
+        }
+    }
+    print("Passed: long spaced and unbroken text wraps at changing pane widths and text scales.")
     let displayFrames = [CGRect(x: 0, y: 0, width: 1440, height: 900), CGRect(x: -1920, y: 0, width: 1920, height: 1080)]
     assert(WindowLayout.openingScreenIndex(frames: displayFrames, pointer: CGPoint(x: -500, y: 400), preferPrimary: true) == 0)
     assert(WindowLayout.openingScreenIndex(frames: displayFrames, pointer: CGPoint(x: -500, y: 400), preferPrimary: false) == 1)
