@@ -100,9 +100,11 @@ final class PasteDestination {
         // Restore the captured panel first. Activating its app first can bring
         // a different main window forward or dismiss a transient floating panel.
         if let window { AXUIElementPerformAction(window, kAXRaiseAction as CFString) }
-        let fieldRestored = field.map { AXUIElementSetAttributeValue($0, kAXFocusedAttribute as CFString, kCFBooleanTrue) == .success } ?? false
+        if let field { AXUIElementSetAttributeValue(field, kAXFocusedAttribute as CFString, kCFBooleanTrue) }
         let focused = Self.focus()
-        if !fieldRestored && (Self.pid(focused.field) ?? Self.pid(focused.app)) != app.processIdentifier {
+        // AX success only acknowledges the request; it does not prove keyboard focus moved.
+        if PasteReadiness.needsActivation(expected: app.processIdentifier,
+                                          focused: Self.pid(focused.field) ?? Self.pid(focused.app)) {
             app.activate(options: [.activateIgnoringOtherApps])
             if let window { AXUIElementPerformAction(window, kAXRaiseAction as CFString) }
             if let field { AXUIElementSetAttributeValue(field, kAXFocusedAttribute as CFString, kCFBooleanTrue) }
@@ -125,6 +127,9 @@ final class PasteDestination {
 }
 
 enum PasteReadiness {
+    static func needsActivation(expected: pid_t, focused: pid_t?) -> Bool {
+        focused != expected
+    }
     static func matchesProcess(expected: pid_t, focused: pid_t?, frontmost: pid_t?, capturedElement: Bool) -> Bool {
         if let focused { return focused == expected }
         return !capturedElement && frontmost == expected

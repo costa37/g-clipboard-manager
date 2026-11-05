@@ -27,6 +27,8 @@ enum AnnotationControls {
 }
 
 final class AnnotationTextView: NSTextView {
+    private let textUndoManager = UndoManager()
+    override var undoManager: UndoManager? { textUndoManager }
     weak var canvas: ImageCanvasView?
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { canvas?.finishText(); return }; super.keyDown(with: event)
@@ -99,7 +101,7 @@ final class ImageCanvasView: NSView, NSTextViewDelegate {
         let editor = AnnotationTextView(frame: screenRect(mark.rect)); editor.canvas = self; editor.delegate = self
         editor.isRichText = false; editor.isEditable = true; editor.isSelectable = true; editor.drawsBackground = false
         editor.textContainerInset = .zero; editor.textContainer?.lineFragmentPadding = 0
-        editor.isVerticallyResizable = false; editor.isHorizontallyResizable = false; editor.allowsUndo = false
+        editor.isVerticallyResizable = false; editor.isHorizontallyResizable = false; editor.allowsUndo = true
         editor.string = mark.text; textEditor = editor; addSubview(editor); layoutText(); window?.makeFirstResponder(editor)
         editor.setSelectedRange(NSRange(location: (editor.string as NSString).length, length: 0))
     }

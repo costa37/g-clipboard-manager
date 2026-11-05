@@ -240,6 +240,18 @@ final class Store: ObservableObject {
     }
 }
 
+enum BrowsingKeys {
+    static func handles(_ key: UInt16, modifiers: NSEvent.ModifierFlags, query: String) -> Bool {
+        let flags = modifiers.intersection([.command, .control, .option, .shift])
+        switch key {
+        case 48, 36, 76: return flags.isEmpty || flags == .shift
+        case 125, 126: return flags.isEmpty
+        case 124: return flags.isEmpty && query.isEmpty
+        default: return false
+        }
+    }
+}
+
 final class MatchingStyleTextView: NSTextView {
     // Keep existing rich runs; newly pasted text uses the insertion point's style.
     override func paste(_ sender: Any?) { pasteAsPlainText(sender) }
@@ -464,7 +476,7 @@ struct Content: View {
             Divider()
             HStack {
                 if store.editing?.isImage == true && store.message.isEmpty { ImageEditHint(draft: store.imageDraft) }
-                else { Text(store.message.isEmpty ? (store.editing == nil ? "↑↓ Browse    ↵ Paste    ⇧↵ With formatting    → Edit" : "Esc / ⌘← Back to list    ⌘S Save as new item") : store.message).lineLimit(1).help(store.message) }
+                else { Text(store.message.isEmpty ? (store.editing == nil ? "↑↓ Browse    ↵ Paste    ⇧↵ With formatting    → Edit" : "Esc Back to list    ⌘S Save as new item") : store.message).lineLimit(1).help(store.message) }
                 Spacer()
                 if store.editing?.isImage == true || store.current?.isImage == true { ImageZoomControls(draft: store.editing?.isImage == true ? store.imageDraft : store.imagePreview.draft) }
                 ImageStatus(draft: store.editing?.isImage == true ? store.imageDraft : store.imagePreview.draft, editing: store.editing?.isImage == true, clip: store.current)
@@ -505,7 +517,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
         let appMenu = NSMenu(); let root = NSMenuItem(); appMenu.addItem(root)
         let edit = NSMenu(title: "Edit"); root.submenu = edit
-        for (title, action, key) in [("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a"), ("Undo", "undo:", "z")] { edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key) }; NSApp.mainMenu = appMenu
+        for (title, action, key) in [("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a"), ("Undo", "undo:", "z")] { edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key) }
+        let redo = edit.addItem(withTitle: "Redo", action: NSSelectorFromString("redo:"), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        NSApp.mainMenu = appMenu
         if !CommandLine.arguments.contains("--preview"),
            let stored = UserDefaults.standard.array(forKey: "preferredWindowSize") as? [Double], stored.count == 2 {
             preferredWindowSize = WindowLayout.valid(CGSize(width: stored[0], height: stored[1]))
@@ -532,16 +547,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.panel.isVisible else { return event }
             if event.type != .keyDown { if event.window !== self.panel && NSApp.modalWindow == nil { self.panel.orderOut(nil) }; return event }
-            guard NSApp.modalWindow == nil else { return event }
+            guard NSApp.modalWindow == nil, event.window === self.panel else { return event }
+            let textResponder = self.panel.firstResponder as? NSTextView
+            // Input-method composition owns Return, Escape and navigation until committed.
+            if textResponder?.hasMarkedText() == true { return event }
             if event.keyCode == 53 { if self.store.editing?.isImage == true && self.store.imageDraft.escape() { return nil }; if self.store.editing != nil { self.store.editing = nil } else { self.dismissAndRestoreFocus() }; return nil }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             if self.store.editing != nil {
-                if event.keyCode == 123 && flags.contains(.command) { self.store.editing = nil; return nil }
-                if self.store.editing?.isImage == true && flags == .command && event.charactersIgnoringModifiers == "z" { self.store.imageDraft.undo(); return nil }
+                if self.store.editing?.isImage == true && !(textResponder?.isEditable ?? false) && flags.intersection([.command, .control, .option, .shift]) == .command && event.charactersIgnoringModifiers?.lowercased() == "z" { self.store.imageDraft.undo(); return nil }
                 if flags.intersection([.command, .control, .option, .shift]) == .command && event.charactersIgnoringModifiers?.lowercased() == "s" { self.store.saveEdited(); return nil }
                 return event
             }
-            if event.keyCode == 48 && flags.intersection([.command, .control, .option]).isEmpty {
+            // A selected text preview keeps normal text navigation and selection.
+            if textResponder is MatchingStyleTextView && [48, 123, 124, 125, 126].contains(event.keyCode) { return event }
+            guard BrowsingKeys.handles(event.keyCode, modifiers: flags, query: self.store.query) else { return event }
+            if event.keyCode == 48 {
                 self.store.cycleFilter(backward: flags.contains(.shift)); return nil
             }
             switch event.keyCode {
@@ -762,13 +782,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         store.message = reason
         NSApp.activate(ignoringOtherApps: true); panel.makeKeyAndOrderFront(nil)
     }
-    func waitForDestination(_ target: PasteDestination, deadline: Date, expectedChange: Int, attempt: UUID, readyOnce: Bool = false) {
+    func waitForDestination(_ target: PasteDestination, deadline: Date, expectedChange: Int, attempt: UUID, readyOnce: Bool = false, poll: Int = 0) {
         guard attempt == pasteAttempt else { return }
         guard NSPasteboard.general.changeCount == expectedChange else {
             pasteFallback("Clipboard changed before paste. Select the item again."); return
         }
         if Date() < deadline { target.prepareForPaste() }
-        let ready = target.isReady() && PasteReadiness.modifiersReleased(CGEventSource.flagsState(.combinedSessionState))
+        let destinationReady = target.isReady()
+        let modifiersReleased = PasteReadiness.modifiersReleased(CGEventSource.flagsState(.combinedSessionState))
+        let ready = destinationReady && modifiersReleased
+        // Retry normal windows sparingly: activating an app can complete asynchronously.
+        // Gemini has its own toggle-aware restoration path above.
+        if !destinationReady && target.geminiMiniTitle == nil && [5, 12, 20].contains(poll) && Date() < deadline {
+            target.restore()
+        }
         if ready && readyOnce {
             let source = CGEventSource(stateID: .privateState)
             guard let down = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
@@ -780,16 +807,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         guard Date() < deadline, !target.app.isTerminated else {
-            pasteFallback("Copied, but the original input field could not regain focus. Click it and press ⌘V."); return
+            pasteFallback(destinationReady && !modifiersReleased
+                ? "Copied, but a shortcut key was still held. Release the keys and try again, or press ⌘V in the destination."
+                : "Copied, but the original input field could not regain focus. Click it and press ⌘V."); return
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
-            self?.waitForDestination(target, deadline: deadline, expectedChange: expectedChange, attempt: attempt, readyOnce: ready)
+            self?.waitForDestination(target, deadline: deadline, expectedChange: expectedChange, attempt: attempt, readyOnce: ready, poll: poll + 1)
         }
     }
 }
 
 if CommandLine.arguments.contains("--self-test") {
     ClipboardIOTests.run()
+    for key: UInt16 in [123, 124, 125, 126] {
+        for flags: NSEvent.ModifierFlags in [.command, .option, .shift, [.command, .shift], [.option, .shift], .control] {
+            assert(!BrowsingKeys.handles(key, modifiers: flags, query: ""))
+        }
+    }
+    assert(!BrowsingKeys.handles(124, modifiers: [], query: "search text"))
+    assert(BrowsingKeys.handles(124, modifiers: [], query: ""))
+    for key: UInt16 in [36, 76, 48] {
+        assert(BrowsingKeys.handles(key, modifiers: [], query: "text"))
+        assert(BrowsingKeys.handles(key, modifiers: .shift, query: "text"))
+        assert(!BrowsingKeys.handles(key, modifiers: .command, query: "text"))
+    }
+    print("Passed: browsing shortcuts preserve modified arrows, search caret movement and standard modifier combinations.")
+    let annotationEditor = AnnotationTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 100))
+    annotationEditor.allowsUndo = true
+    annotationEditor.undoManager?.beginUndoGrouping()
+    annotationEditor.insertText("hello", replacementRange: NSRange(location: 0, length: 0))
+    annotationEditor.undoManager?.endUndoGrouping()
+    assert(annotationEditor.string == "hello")
+    annotationEditor.undoManager?.undo()
+    assert(annotationEditor.string.isEmpty)
+    annotationEditor.undoManager?.redo()
+    assert(annotationEditor.string == "hello")
+    print("Passed: annotation text Undo/Redo restores typed content.")
     let wrapScroll = WrappingTextScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 250))
     let wrapText = MatchingStyleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 250))
     wrapText.isHorizontallyResizable = false
@@ -845,6 +898,10 @@ if CommandLine.arguments.contains("--self-test") {
     assert(!GeminiMiniChatPolicy.isMini(bundleID: "another.app", title: "Gemini Mini Chat — New chat"))
     assert(GeminiMiniChatPolicy.isOpenButton(identifier: "collapse_button", description: nil))
     assert(!GeminiMiniChatPolicy.isOpenButton(identifier: nil, description: "Open full app"))
+    assert(PasteReadiness.needsActivation(expected: 42, focused: 99))
+    assert(PasteReadiness.needsActivation(expected: 42, focused: nil))
+    // A floating panel can own keyboard focus while another app appears frontmost.
+    assert(!PasteReadiness.needsActivation(expected: 42, focused: 42))
     assert(PasteReadiness.matchesProcess(expected: 42, focused: 42, frontmost: 99, capturedElement: true))
     assert(!PasteReadiness.matchesProcess(expected: 42, focused: 99, frontmost: 42, capturedElement: true))
     assert(!PasteReadiness.matchesProcess(expected: 42, focused: nil, frontmost: 42, capturedElement: true))
