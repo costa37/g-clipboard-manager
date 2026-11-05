@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.14 — Paste focus recovery
+
+- Check actual keyboard focus after requesting restoration, even when the accessibility request reports success.
+- Retry normal-window restoration up to three times while retaining original field/window checks and the separate Gemini path.
+- Distinguish held shortcut keys from a focus-restoration failure in the fallback message.
+- The reported intermittent ChatGPT prompt failure still needs live confirmation.
+
+
+## 0.3.13 — Standard editing shortcuts
+
+- Command-Left no longer exits editing; Escape and Back still return to preview.
+- Modified arrows preserve caret movement and selection; Right Arrow moves within nonempty search text.
+- Text previews keep native selection navigation. Input-method composition is not interrupted by app shortcuts.
+- Image annotation text supports native Undo/Redo without undoing the whole annotation. Added Command-Shift-Z for text Redo.
+
+
 ## 0.3.12 — Formatted paste and text wrapping
 
 - Shift + Return pastes saved formatting; Return still pastes plain text.
