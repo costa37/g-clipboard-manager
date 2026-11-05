@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.12 — Formatted paste and text wrapping
+
+- Shift + Return pastes saved formatting; Return still pastes plain text.
+- Text previews and editors wrap to the available pane width, including when resizing or changing text size.
+
+
 ## 0.3.11 — Clearer Save icon
 
 Both text and image editors now show a checkmark beside Save. The Command-S shortcut and save behavior are unchanged.
