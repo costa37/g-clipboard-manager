@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.15 — Readable plain-text editing
+
+- Open text clips with the same unformatted text and readable colors as the preview.
+- Keep pasted text and saved edits plain; preserve the original clip and its formatting.
+- Publish a tested app download automatically when the version changes on main.
+
 ## 0.3.14 — Paste focus recovery
 
 - Check actual keyboard focus after requesting restoration, even when the accessibility request reports success.

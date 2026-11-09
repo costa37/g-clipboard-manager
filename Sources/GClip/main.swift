@@ -204,7 +204,7 @@ final class Store: ObservableObject {
         return true
     }
     func select(_ item: Clip) { if editing?.isImage == true && item.isImage { if editing?.id != item.id { edit(item) }; return }; editing = nil; selected = item.id }
-    func edit(_ item: Clip) { message = ""; selected = item.id; imageEditorLoader.select(item.isImage ? item : nil); draft = item.attributed; editing = item }
+    func edit(_ item: Clip) { message = ""; selected = item.id; imageEditorLoader.select(item.isImage ? item : nil); draft = item.plainPreview; editing = item }
     func saveEdited() {
         guard var item = editing else { return }
         item.id = UUID()
@@ -215,7 +215,6 @@ final class Store: ObservableObject {
         } else {
             item.text = draft.string
             item.data = [NSPasteboard.PasteboardType.string.rawValue: Data(item.text.utf8)]
-            if let rtf = try? draft.data(from: NSRange(location: 0, length: draft.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]) { item.data[NSPasteboard.PasteboardType.rtf.rawValue] = rtf }
         }
         guard copy(item, rich: true, addition: true) else { return }; editing = nil; query = ""; message = "Saved a new item. Original preserved."
     }
@@ -252,8 +251,8 @@ enum BrowsingKeys {
     }
 }
 
-final class MatchingStyleTextView: NSTextView {
-    // Keep existing rich runs; newly pasted text uses the insertion point's style.
+final class PlainTextView: NSTextView {
+    // Pasted text uses the same readable plain-text style as the editor.
     override func paste(_ sender: Any?) { pasteAsPlainText(sender) }
 }
 
@@ -276,7 +275,7 @@ final class WrappingTextScrollView: NSScrollView {
     }
 }
 
-struct RichEditor: NSViewRepresentable {
+struct PlainTextEditor: NSViewRepresentable {
     @Binding var value: NSAttributedString
     var editable = true
     var textScale: Double = 1
@@ -285,14 +284,14 @@ struct RichEditor: NSViewRepresentable {
         let scroll = WrappingTextScrollView()
         scroll.hasHorizontalScroller = false
         scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
-        let text = MatchingStyleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let text = PlainTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         text.minSize = .zero; text.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         text.isVerticallyResizable = true; text.isHorizontallyResizable = false
         text.autoresizingMask = [.width]
         text.textContainer?.widthTracksTextView = true
         text.textContainer?.containerSize = NSSize(width: 600, height: CGFloat.greatestFiniteMagnitude)
         scroll.documentView = text
-        text.isEditable = editable; text.isSelectable = true; text.allowsUndo = true; text.isRichText = true; text.isAutomaticQuoteSubstitutionEnabled = false
+        text.isEditable = editable; text.isSelectable = true; text.allowsUndo = true; text.isRichText = false; text.isAutomaticQuoteSubstitutionEnabled = false
         text.textContainerInset = NSSize(width: 14, height: 14)
         text.delegate = context.coordinator; text.textStorage?.setAttributedString(value)
         text.typingAttributes = value.length > 0 ? value.attributes(at: 0, effectiveRange: nil) : [.font: NSFont.systemFont(ofSize: 15), .foregroundColor: NSColor.labelColor]
@@ -311,8 +310,8 @@ struct RichEditor: NSViewRepresentable {
         if !text.attributedString().isEqual(to: value) { text.textStorage?.setAttributedString(value) }
     }
     final class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: RichEditor
-        init(_ parent: RichEditor) { self.parent = parent }
+        var parent: PlainTextEditor
+        init(_ parent: PlainTextEditor) { self.parent = parent }
         func textDidChange(_ notification: Notification) { if let text = notification.object as? NSTextView { parent.value = text.attributedString() } }
     }
 }
@@ -450,10 +449,10 @@ struct Content: View {
                             HStack {
                                 Button { store.editing = nil } label: { Label("Back", systemImage: "chevron.left") }.help("Back to preview (Escape)")
                                 Spacer()
-                                Button { store.saveEdited() } label: { Label("Save", systemImage: "checkmark") }.buttonStyle(.borderedProminent).help("Save as a new formatted item (⌘S)")
+                                Button { store.saveEdited() } label: { Label("Save", systemImage: "checkmark") }.buttonStyle(.borderedProminent).help("Save as a new plain-text item (⌘S)")
                             }.controlSize(.small).padding(8)
                             Divider()
-                            RichEditor(value: $store.draft, textScale: store.textScale)
+                            PlainTextEditor(value: $store.draft, textScale: store.textScale)
                         }
                     }
                 } else if let item = store.current, !ClearCommand.isCommand(store.query) {
@@ -466,7 +465,7 @@ struct Content: View {
                         }.controlSize(.small).padding(8)
                         Divider()
                         if item.isImage { ImageCanvas(draft: store.imagePreview.draft, editable: false) }
-                        else { RichEditor(value: .constant(item.plainPreview), editable: false, textScale: store.textScale).id(item.id) }
+                        else { PlainTextEditor(value: .constant(item.plainPreview), editable: false, textScale: store.textScale).id(item.id) }
                     }
                 } else {
                     Text("Select a clip to preview it").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -559,7 +558,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 return event
             }
             // A selected text preview keeps normal text navigation and selection.
-            if textResponder is MatchingStyleTextView && [48, 123, 124, 125, 126].contains(event.keyCode) { return event }
+            if textResponder is PlainTextView && [48, 123, 124, 125, 126].contains(event.keyCode) { return event }
             guard BrowsingKeys.handles(event.keyCode, modifiers: flags, query: self.store.query) else { return event }
             if event.keyCode == 48 {
                 self.store.cycleFilter(backward: flags.contains(.shift)); return nil
@@ -844,7 +843,7 @@ if CommandLine.arguments.contains("--self-test") {
     assert(annotationEditor.string == "hello")
     print("Passed: annotation text Undo/Redo restores typed content.")
     let wrapScroll = WrappingTextScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 250))
-    let wrapText = MatchingStyleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 250))
+    let wrapText = PlainTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 250))
     wrapText.isHorizontallyResizable = false
     wrapText.isVerticallyResizable = true
     wrapText.textContainerInset = NSSize(width: 14, height: 14)
