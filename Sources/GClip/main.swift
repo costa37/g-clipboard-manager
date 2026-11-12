@@ -739,7 +739,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, SPUS
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         store.directPasteAllowed = AXIsProcessTrusted()
         if !store.directPasteAllowed {
-            let directPaste = action(menu, "Enable Automatic Paste…", #selector(accessibility))
+            let directPaste = action(menu, "Enable Automatic Paste…", #selector(openAccessibilitySettings))
             directPaste.toolTip = "Allow G-Clip to paste into other apps. After an update, you may need to remove and re-add G-Clip in Accessibility settings."
         }
         if let updaterController {
@@ -812,7 +812,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, SPUS
         if !panel.isVisible { fitWindow(center: true, usePreferred: true) }
         panel.makeKeyAndOrderFront(nil)
     }
-    func openAccessibilitySettings() {
+    @objc func openAccessibilitySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             panel.orderOut(nil)
             NSWorkspace.shared.open(url)

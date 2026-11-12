@@ -1,6 +1,6 @@
 # G-Clip
 
-A native, keyboard-friendly macOS clipboard manager for personal use. **Apple Silicon (M1 or newer), macOS 13+.** Current version: **0.3.18**.
+A native, keyboard-friendly macOS clipboard manager for personal use. **Apple Silicon (M1 or newer), macOS 13+.** Current version: **0.3.19**.
 
 ## Screenshots
 
@@ -20,7 +20,7 @@ Screenshots use synthetic sample content from 0.3.8; the editor’s Copy button 
 
 ## Install
 
-1. Download `G-Clip-0.3.18-arm64.zip` from [Releases](https://github.com/costa37/g-clipboard-manager/releases).
+1. Download `G-Clip-0.3.19-arm64.zip` from [Releases](https://github.com/costa37/g-clipboard-manager/releases).
 2. Unzip it and drag **G-Clip.app** into **Applications**. Quit any older G-Clip before replacing it.
 3. Open the app. This personal build is ad-hoc signed and is **not Apple-notarized**. If macOS blocks it, review the message in System Settings → Privacy & Security and use **Open Anyway** only if you trust this download. Managed Macs may prohibit it.
 4. For automatic pasting, grant G-Clip access in System Settings → Privacy & Security → Accessibility. After updating, remove the existing G-Clip entry with **−**, even if its toggle is already on. Use **+** to add G-Clip from Applications again, then turn its permission on.

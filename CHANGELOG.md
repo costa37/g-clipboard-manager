@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.19 — Direct Accessibility settings access
+
+- Open Accessibility settings directly from the menu-bar Enable Automatic Paste action, without first opening G-Clip’s instructions.
+- Keep the main-window warning’s inline recovery guidance available.
+
 ## 0.3.18 — Clearer Accessibility instructions
 
 - Explain that after updating, users should remove and re-add G-Clip in Accessibility even when its existing toggle is on.
