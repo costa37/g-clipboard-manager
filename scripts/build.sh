@@ -35,6 +35,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>SUFeedURL</key><string>https://github.com/costa37/g-clipboard-manager/releases/latest/download/appcast.xml</string>
 <key>SUPublicEDKey</key><string>$PUBLIC_KEY</string>
 <key>SUAllowsAutomaticUpdates</key><false/>
+<key>SUEnableAutomaticChecks</key><true/>
 <key>SUEnableSystemProfiling</key><false/>
 <key>SUVerifyUpdateBeforeExtraction</key><true/>
 </dict></plist>

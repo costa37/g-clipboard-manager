@@ -88,6 +88,7 @@ final class Store: ObservableObject {
     @Published var paused = false { didSet { change = NSPasteboard.general.changeCount } }
     @Published var windowMinimum = WindowLayout.preferredMinimum
     @Published var directPasteAllowed = AXIsProcessTrusted()
+    @Published var permissionHelpExpanded = false
     var dividerStart: CGFloat?
     @Published var splitRatio: Double = {
         let value = UserDefaults.standard.object(forKey: "splitRatio") as? Double ?? 0.35
@@ -377,6 +378,7 @@ struct Content: View {
     @ObservedObject var store: Store
     var paste: (Clip, Bool) -> Void
     var enablePaste: () -> Void
+    var openPasteSettings: () -> Void
     @FocusState var searchFocused: Bool
     var body: some View {
         VStack(spacing: 0) {
@@ -493,6 +495,19 @@ struct Content: View {
                 }
                 .buttonStyle(.plain)
                 .help("Enable automatic paste or restore Accessibility access after an update")
+                if store.permissionHelpExpanded {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("In System Settings → Privacy & Security → Accessibility, enable G-Clip. If G-Clip is missing, add it from Applications. If access is already enabled but paste stopped after an update, remove the old entry and add G-Clip again. Your clipboard history is preserved.")
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack {
+                            Button("Open Accessibility Settings", action: openPasteSettings)
+                            Button("Not Now") { store.permissionHelpExpanded = false }
+                            Spacer()
+                        }.controlSize(.small)
+                    }
+                    .font(.system(size: 11))
+                    .padding(.horizontal, 12).padding(.bottom, 8)
+                }
                 Divider()
             }
             HStack {
@@ -557,7 +572,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, SPUS
         panel.isMovableByWindowBackground = true; panel.isReleasedWhenClosed = false; panel.hidesOnDeactivate = false
         panel.level = .popUpMenu; panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.delegate = self
-        panel.contentView = NSHostingView(rootView: Content(store: store, paste: { [weak self] item, rich in self?.paste(item, rich: rich) }, enablePaste: { [weak self] in self?.accessibility() }))
+        panel.contentView = NSHostingView(rootView: Content(store: store, paste: { [weak self] item, rich in self?.paste(item, rich: rich) }, enablePaste: { [weak self] in self?.accessibility() }, openPasteSettings: { [weak self] in self?.openAccessibilitySettings() }))
         rememberDestination(NSWorkspace.shared.frontmostApplication)
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] notification in
             guard let self else { return }
@@ -791,17 +806,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, SPUS
     @objc func quit() { NSApp.terminate(nil) }
     @objc func accessibility() {
         guard !AXIsProcessTrusted() else { store.directPasteAllowed = true; return }
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Enable Automatic Paste"
-        alert.informativeText = "In System Settings → Privacy & Security → Accessibility, enable G-Clip. If it is already enabled but automatic paste stopped after an update, remove the old G-Clip entry with the minus button, then add G-Clip from Applications again. Your clipboard history is preserved."
-        alert.addButton(withTitle: "Open Accessibility Settings")
-        alert.addButton(withTitle: "Not Now")
-        if alert.runModal() == .alertFirstButtonReturn { openAccessibilitySettings() }
+        store.permissionHelpExpanded = true
+        // Inline guidance stays with the floating panel and never starts a modal loop.
+        // Do not reset the browser or editor: users can keep working while it is open.
+        if !panel.isVisible { fitWindow(center: true, usePreferred: true) }
+        panel.makeKeyAndOrderFront(nil)
     }
     func openAccessibilitySettings() {
-        _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") { NSWorkspace.shared.open(url) }
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            panel.orderOut(nil)
+            NSWorkspace.shared.open(url)
+        }
     }
     @objc func commandShortcut() { registerShortcut(alternate: false) }
     @objc func alternateShortcut() { registerShortcut(alternate: true) }
@@ -827,14 +842,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, SPUS
         panel.orderOut(nil)
         store.directPasteAllowed = AXIsProcessTrusted()
         guard store.directPasteAllowed else {
-            NSApp.activate(ignoringOtherApps: true)
-            let alert = NSAlert()
-            alert.messageText = "Allow G-Clip to paste into other apps"
-            alert.informativeText = "The item was copied, but macOS Accessibility permission is required for automatic paste. Enable the installed G-Clip in System Settings → Privacy & Security → Accessibility. If you replaced the app, remove its old entry and add the installed copy again if necessary."
-            alert.addButton(withTitle: "Open Accessibility Settings")
-            alert.addButton(withTitle: "Paste manually")
-            if alert.runModal() == .alertFirstButtonReturn { openAccessibilitySettings() }
-            else { target?.restore() }
+            store.permissionHelpExpanded = true
+            store.message = "Copied. Press ⌘V to paste, or enable automatic paste below."
+            target?.restore()
             return
         }
         guard let target, target.app.processIdentifier != ProcessInfo.processInfo.processIdentifier, !target.app.isTerminated else {

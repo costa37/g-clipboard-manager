@@ -44,8 +44,8 @@ Run the tests from the debug app bundle, which contains Sparkle. Release builds 
 ## Verify before distributing
 
 - Install the first updater-enabled version manually in Applications. Existing 0.3.15 and older installations cannot discover updates themselves.
-- Test on a separate Mac or macOS test account using two increasing builds and a staging HTTPS feed. Confirm Check for Updates, declining/accepting automatic checks, Install and Relaunch, and preserved clipboard history/settings.
+- Test on a separate Mac or macOS test account using two increasing builds and a staging HTTPS feed. Confirm Check for Updates, default automatic checks and opting out, Install and Relaunch, and preserved clipboard history/settings.
 - Confirm Accessibility controls disappear when granted and reappear when revoked. An ad-hoc update may require removing and re-adding G-Clip in Accessibility. Never change the user's permissions automatically.
 - Confirm a modified ZIP is rejected. Keep the bundle identifier stable. Check that app launches and nested framework signatures verify after extraction.
 
-A successful local build and signature check do not prove the full macOS install/relaunch/permission path. Complete that live test before distributing broadly. Preview mode and self-tests do not start the updater. Ordinary launches ask about automatic checks using Sparkle's standard consent flow; automatic installation and system profiling are disabled.
+A successful local build and signature check do not prove the full macOS install/relaunch/permission path. Complete that live test before distributing broadly. Preview mode and self-tests do not start the updater. Automatic checks default to enabled; saved user preferences are respected. Automatic installation and system profiling are disabled.

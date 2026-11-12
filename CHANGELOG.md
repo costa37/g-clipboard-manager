@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.17 — Nonblocking permission guidance
+
+- Expand Accessibility instructions inside the main window instead of opening a modal dialog behind it. Editing and keyboard shortcuts remain available while the guidance is visible.
+- Hide the floating window when opening System Settings, and keep manual paste available without blocking alerts.
+- Enable automatic update checks by default while respecting saved opt-outs. Installation still requires confirmation.
+
 ## 0.3.16 — In-app updates
 
 - Check for updates from the menu bar, with optional automatic checks.
