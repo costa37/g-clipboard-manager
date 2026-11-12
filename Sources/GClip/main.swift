@@ -4,6 +4,7 @@ import Carbon
 import CryptoKit
 import Combine
 import ServiceManagement
+import Sparkle
 
 struct Clip: Codable, Identifiable {
     var id = UUID()
@@ -473,6 +474,27 @@ struct Content: View {
             }
             }
             Divider()
+            if !store.directPasteAllowed {
+                Button(action: enablePaste) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("Automatic paste needs Accessibility permission. You can still copy clips.")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        Text("Enable Automatic Paste…").foregroundStyle(.tint).fixedSize()
+                        Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                    }
+                    .font(.system(size: 11))
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.08))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Enable automatic paste or restore Accessibility access after an update")
+                Divider()
+            }
             HStack {
                 if store.editing?.isImage == true && store.message.isEmpty { ImageEditHint(draft: store.imageDraft) }
                 else { Text(store.message.isEmpty ? (store.editing == nil ? "↑↓ Browse    ↵ Paste    ⇧↵ With formatting    → Edit" : "Esc Back to list    ⌘S Save as new item") : store.message).lineLimit(1).help(store.message) }
@@ -492,8 +514,10 @@ struct Content: View {
 }
 
 final class FloatingPanel: NSPanel { override var canBecomeKey: Bool { true }; override var canBecomeMain: Bool { true } }
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, SPUStandardUserDriverDelegate {
     let store = Store()
+    var availableUpdateVersion: String?
+    var updaterController: SPUStandardUpdaterController?
     var status: NSStatusItem!
     var panel: FloatingPanel!
     var previous: NSRunningApplication?
@@ -514,6 +538,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var hotkeyLabel = "⌥⌘Space"
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Preview and command-line test launches must not contact the update service.
+        if !CommandLine.arguments.contains("--preview"), Bundle.main.bundleURL.pathExtension == "app" {
+            updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: self)
+        }
         let appMenu = NSMenu(); let root = NSMenuItem(); appMenu.addItem(root)
         let edit = NSMenu(title: "Edit"); root.submenu = edit
         for (title, action, key) in [("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a"), ("Undo", "undo:", "z")] { edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key) }
@@ -540,7 +568,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard let self, self.panel.isVisible else { return }; self.fitWindow(center: self.alwaysOpenOnMainDisplay, usePreferred: false)
         }
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        status.button?.image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "G-Clip")
+        status.button?.image = MenuBarIcon.make()
         status.button?.target = self; status.button?.action = #selector(statusClicked); status.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         installHotkey()
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { [weak self] event in
@@ -694,11 +722,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         alternate.state = hotkey != nil && hotkeyLabel == "⌃⌥Space" ? .on : .off
         let login = action(menu, SMAppService.mainApp.status == .requiresApproval ? "Launch at login — approval needed…" : "Launch at login", #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        let directPaste = action(menu, "Open Accessibility Settings…", #selector(accessibility))
-        directPaste.toolTip = "Opens macOS permission settings. Allow G-Clip there to paste automatically into your previous app."
+        store.directPasteAllowed = AXIsProcessTrusted()
+        if !store.directPasteAllowed {
+            let directPaste = action(menu, "Enable Automatic Paste…", #selector(accessibility))
+            directPaste.toolTip = "Allow G-Clip to paste into other apps. After an update, you may need to remove and re-add G-Clip in Accessibility settings."
+        }
+        if let updaterController {
+            menu.addItem(.separator())
+            let check = menu.addItem(withTitle: availableUpdateVersion.map { "Install Update \($0)…" } ?? "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+            check.target = updaterController
+            let automatic = action(menu, "Automatically Check for Updates", #selector(toggleUpdateChecks))
+            automatic.state = updaterController.updater.automaticallyChecksForUpdates ? .on : .off
+        }
         menu.addItem(.separator())
         _ = action(menu, "Quit G-Clip", #selector(quit), key: "q")
         status.menu = menu; status.button?.performClick(nil); status.menu = nil
+    }
+    // Menu-bar apps have no Dock tile on which Sparkle can display a reminder.
+    var supportsGentleScheduledUpdateReminders: Bool { true }
+    func standardUserDriverShouldHandleShowingScheduledUpdate(_ update: SUAppcastItem, andInImmediateFocus immediateFocus: Bool) -> Bool { false }
+    func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
+        if !handleShowingUpdate {
+            availableUpdateVersion = update.displayVersionString
+            status?.button?.image = MenuBarIcon.make(updateAvailable: true)
+            status?.button?.toolTip = "G-Clip \(update.displayVersionString) is available. Right-click to install."
+        } else {
+            panel?.orderOut(nil)
+        }
+    }
+    func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) { clearUpdateReminder() }
+    func standardUserDriverWillFinishUpdateSession() { clearUpdateReminder() }
+    func clearUpdateReminder() {
+        availableUpdateVersion = nil
+        status?.button?.image = MenuBarIcon.make()
+        status?.button?.toolTip = "G-Clip"
+    }
+    @objc func toggleUpdateChecks() {
+        guard let updater = updaterController?.updater else { return }
+        updater.automaticallyChecksForUpdates.toggle()
     }
     @objc func toggleMainDisplay() {
         alwaysOpenOnMainDisplay.toggle()
@@ -729,6 +790,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationWillTerminate(_ notification: Notification) { store.flushPersistence() }
     @objc func quit() { NSApp.terminate(nil) }
     @objc func accessibility() {
+        guard !AXIsProcessTrusted() else { store.directPasteAllowed = true; return }
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Enable Automatic Paste"
+        alert.informativeText = "In System Settings → Privacy & Security → Accessibility, enable G-Clip. If it is already enabled but automatic paste stopped after an update, remove the old G-Clip entry with the minus button, then add G-Clip from Applications again. Your clipboard history is preserved."
+        alert.addButton(withTitle: "Open Accessibility Settings")
+        alert.addButton(withTitle: "Not Now")
+        if alert.runModal() == .alertFirstButtonReturn { openAccessibilitySettings() }
+    }
+    func openAccessibilitySettings() {
         _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") { NSWorkspace.shared.open(url) }
     }
@@ -762,7 +833,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             alert.informativeText = "The item was copied, but macOS Accessibility permission is required for automatic paste. Enable the installed G-Clip in System Settings → Privacy & Security → Accessibility. If you replaced the app, remove its old entry and add the installed copy again if necessary."
             alert.addButton(withTitle: "Open Accessibility Settings")
             alert.addButton(withTitle: "Paste manually")
-            if alert.runModal() == .alertFirstButtonReturn { accessibility() }
+            if alert.runModal() == .alertFirstButtonReturn { openAccessibilitySettings() }
             else { target?.restore() }
             return
         }

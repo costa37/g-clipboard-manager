@@ -41,7 +41,7 @@ def main():
         match = re.search(r"^## " + re.escape(current["version"]) + r"(?: —[^\n]*)?\n(.*?)(?=^## |\Z)", changelog, re.M | re.S)
         if not match or not match[1].strip():
             raise ValueError("Add release notes to CHANGELOG.md for this version")
-        notes = match[1].strip() + "\n\n## Install\n\nRequires Apple Silicon and macOS 13+. Download " + f"G-Clip-{current['version']}-arm64.zip" + ", unzip, quit G-Clip, and replace the app in Applications. The app is ad-hoc signed and not notarized. macOS may require Open Anyway in Privacy & Security and renewed Accessibility permission. Updates are manual.\n"
+        notes = match[1].strip() + "\n\n## Install\n\nRequires Apple Silicon and macOS 13+. Download " + f"G-Clip-{current['version']}-arm64.zip" + ", unzip, quit G-Clip, and replace the app in Applications. The app is ad-hoc signed and not notarized. macOS may require Open Anyway in Privacy & Security and renewed Accessibility permission. Existing updater-enabled installations can use Check for Updates from the menu bar. Older installations need this manual installation once.\n"
         Path("release-notes.txt").write_text(notes)
     with open(os.environ["GITHUB_OUTPUT"], "a") as output:
         output.write(f"changed={str(changed).lower()}\nversion={current['version']}\n")

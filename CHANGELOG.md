@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.16 — In-app updates
+
+- Check for updates from the menu bar, with optional automatic checks.
+- Download, verify, install and relaunch updates through Sparkle; installation requires user confirmation.
+- Show a bottom-panel permission message and Enable Automatic Paste button only when Accessibility permission is missing, alongside the conditional menu item and recovery instructions.
+- Build and sign releases locally, then publish the verified update archive and feed to GitHub without uploading the private signing key.
+- Users on 0.3.15 or earlier need one manual installation to get the updater. Accessibility may still need reauthorization after updates.
+
 ## 0.3.15 — Readable plain-text editing
 
 - Open text clips with the same unformatted text and readable colors as the preview.

@@ -1,4 +1,4 @@
-name: Publish versioned app
+name: Validate versioned app
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
     paths: [version.json]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: app-release
@@ -22,7 +22,9 @@ jobs:
           fetch-depth: 0
 
       - name: Test release rules
-        run: python3 scripts/test-release-metadata.py
+        run: |
+          python3 scripts/test-release-metadata.py
+          python3 scripts/test-appcast.py
 
       - name: Validate version change and release notes
         id: metadata
@@ -35,40 +37,8 @@ jobs:
         run: |
           test "$(uname -m)" = arm64
           CONFIGURATION=debug bash scripts/build.sh
-          .build/debug/GClip --self-test
+          dist/G-Clip.app/Contents/MacOS/GClip --self-test
 
-      - name: Build and package release
+      - name: Build release
         if: steps.metadata.outputs.changed == 'true'
-        run: |
-          bash scripts/build.sh
-          bash scripts/package.sh
-
-      - name: Verify downloadable archive
-        if: steps.metadata.outputs.changed == 'true'
-        env:
-          VERSION: ${{ steps.metadata.outputs.version }}
-        run: |
-          cd dist
-          shasum -a 256 -c "G-Clip-$VERSION-arm64.zip.sha256"
-          ditto -x -k "G-Clip-$VERSION-arm64.zip" "$RUNNER_TEMP/gclip-extracted"
-          codesign --verify --strict "$RUNNER_TEMP/gclip-extracted/G-Clip.app"
-          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$RUNNER_TEMP/gclip-extracted/G-Clip.app/Contents/Info.plist")" = "$VERSION"
-
-      - name: Publish GitHub release
-        if: steps.metadata.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          VERSION: ${{ steps.metadata.outputs.version }}
-        run: |
-          TAG="v$VERSION"
-          if gh release view "$TAG" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-state"; then
-            if [ "$(cat "$RUNNER_TEMP/release-state")" = false ]; then
-              echo "Release $TAG is already published; leaving it unchanged."
-              exit 0
-            fi
-          else
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "G-Clip $VERSION" --notes-file release-notes.txt --draft
-          fi
-          gh release upload "$TAG" "dist/G-Clip-$VERSION-arm64.zip" "dist/G-Clip-$VERSION-arm64.zip.sha256" --clobber
-          gh release edit "$TAG" --draft=false --latest
+        run: bash scripts/build.sh

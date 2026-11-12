@@ -34,7 +34,7 @@ class ReleaseMetadataTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn('changed=true', output)
         self.assertIn('G-Clip-0.3.15-arm64.zip', notes)
-        self.assertNotIn('Older', notes)
+        self.assertNotIn('- Older.', notes)
 
     def test_unchanged_version_skips_release(self):
         value = {'version': '0.3.15', 'build': 35}
