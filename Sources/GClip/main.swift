@@ -497,7 +497,7 @@ struct Content: View {
                 .help("Enable automatic paste or restore Accessibility access after an update")
                 if store.permissionHelpExpanded {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("In System Settings → Privacy & Security → Accessibility, enable G-Clip. If G-Clip is missing, add it from Applications. If access is already enabled but paste stopped after an update, remove the old entry and add G-Clip again. Your clipboard history is preserved.")
+                        Text("Open System Settings → Privacy & Security → Accessibility. After updating G-Clip, remove the existing G-Clip entry with the minus (−) button—even if its toggle is already on. Then use the plus (+) button to add G-Clip from Applications again and turn its permission on. For a first installation, simply add G-Clip and turn its permission on. Your clipboard history is preserved.")
                             .fixedSize(horizontal: false, vertical: true)
                         HStack {
                             Button("Open Accessibility Settings", action: openPasteSettings)

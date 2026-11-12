@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.18 — Clearer Accessibility instructions
+
+- Explain that after updating, users should remove and re-add G-Clip in Accessibility even when its existing toggle is on.
+- Include the minus/plus steps and distinguish first-time permission setup from update recovery.
+
 ## 0.3.17 — Nonblocking permission guidance
 
 - Expand Accessibility instructions inside the main window instead of opening a modal dialog behind it. Editing and keyboard shortcuts remain available while the guidance is visible.

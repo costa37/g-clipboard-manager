@@ -1,6 +1,6 @@
 # G-Clip
 
-A native, keyboard-friendly macOS clipboard manager for personal use. **Apple Silicon (M1 or newer), macOS 13+.** Current version: **0.3.17**.
+A native, keyboard-friendly macOS clipboard manager for personal use. **Apple Silicon (M1 or newer), macOS 13+.** Current version: **0.3.18**.
 
 ## Screenshots
 
@@ -20,12 +20,12 @@ Screenshots use synthetic sample content from 0.3.8; the editor’s Copy button 
 
 ## Install
 
-1. Download `G-Clip-0.3.17-arm64.zip` from [Releases](https://github.com/costa37/g-clipboard-manager/releases).
+1. Download `G-Clip-0.3.18-arm64.zip` from [Releases](https://github.com/costa37/g-clipboard-manager/releases).
 2. Unzip it and drag **G-Clip.app** into **Applications**. Quit any older G-Clip before replacing it.
 3. Open the app. This personal build is ad-hoc signed and is **not Apple-notarized**. If macOS blocks it, review the message in System Settings → Privacy & Security and use **Open Anyway** only if you trust this download. Managed Macs may prohibit it.
-4. For automatic pasting, grant G-Clip access in System Settings → Privacy & Security → Accessibility. New ad-hoc builds may require granting this again.
+4. For automatic pasting, grant G-Clip access in System Settings → Privacy & Security → Accessibility. After updating, remove the existing G-Clip entry with **−**, even if its toggle is already on. Use **+** to add G-Clip from Applications again, then turn its permission on.
 
-From 0.3.16 onward, right-click the menu-bar icon and choose **Check for Updates…**. When an update is available, a download arrow appears inside the clipboard menu-bar icon. Automatic update checks are enabled by default and can be turned off in the menu; installing an update always requires your confirmation. Users on earlier releases need to install this version manually once. Updates are verified with G-Clip’s update-signing key, then installed and relaunched by Sparkle. Accessibility permission may still need to be granted again after an update. History remains in your user Library when the app is replaced. Each Mac has independent history.
+From 0.3.16 onward, right-click the menu-bar icon and choose **Check for Updates…**. When an update is available, a download arrow appears inside the clipboard menu-bar icon. Automatic update checks are enabled by default and can be turned off in the menu; installing an update always requires your confirmation. Users on earlier releases need to install this version manually once. Updates are verified with G-Clip’s update-signing key, then installed and relaunched by Sparkle. After updating, remove and re-add G-Clip in Accessibility—even if its toggle is already on—then enable its permission. History remains in your user Library when the app is replaced. Each Mac has independent history.
 
 ## Use
 
