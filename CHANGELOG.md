@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.20 — Images first in search filters
+
+- Cycle search filters through All, Images, then Text with Tab; Shift+Tab reverses the order.
+
 ## 0.3.19 — Direct Accessibility settings access
 
 - Open Accessibility settings directly from the menu-bar Enable Automatic Paste action, without first opening G-Clip’s instructions.

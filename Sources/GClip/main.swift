@@ -45,7 +45,7 @@ enum ClipAge {
 }
 
 enum ClipFilter: String, CaseIterable {
-    case all = "All", text = "Text", images = "Images"
+    case all = "All", images = "Images", text = "Text"
     func advanced(backward: Bool = false) -> ClipFilter {
         let cases = Self.allCases
         let index = cases.firstIndex(of: self)!
@@ -392,7 +392,7 @@ struct Content: View {
                     .accessibilityLabel("Current filter: \(store.filter.rawValue)")
                     .help("Tab: next filter · Shift+Tab: previous filter")
                 Text("Tab ⇥").font(.system(size: 10)).foregroundStyle(.secondary)
-                    .help("All → Text → Images; Shift+Tab reverses")
+                    .help("All → Images → Text; Shift+Tab reverses")
                 if store.paused { Image(systemName: "pause.circle.fill").foregroundStyle(.orange).help("Clipboard capture paused") }
                 Text("ESC").font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(.secondary)
             }.padding(.horizontal, 10).padding(.vertical, 7).background(dark ? Color(red: 0.065, green: 0.06, blue: 0.085) : Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8)).padding(10)
@@ -1028,18 +1028,19 @@ if CommandLine.arguments.contains("--self-test") {
     let cleanStore = Store(directory: cleanDirectory)
     cleanStore.insert(a); cleanStore.insert(b)
     let syntheticImage = Clip(text: "", source: "Safari", data: [NSPasteboard.PasteboardType.png.rawValue: Data([0])])
-    assert(ClipFilter.all.advanced() == .text)
-    assert(ClipFilter.text.advanced() == .images)
-    assert(ClipFilter.images.advanced() == .all)
-    assert(ClipFilter.all.advanced(backward: true) == .images)
+    assert(ClipFilter.all.advanced() == .images)
+    assert(ClipFilter.images.advanced() == .text)
+    assert(ClipFilter.text.advanced() == .all)
+    assert(ClipFilter.all.advanced(backward: true) == .text)
     assert(ClipFilter.images.matches(syntheticImage, query: "safari"))
     assert(!ClipFilter.images.matches(syntheticImage, query: "Notes"))
     assert(!ClipFilter.text.matches(syntheticImage, query: ""))
     assert(!ClipFilter.images.matches(a, query: ""))
     assert(ClipFilter.text.matches(a, query: "HELLO"))
     cleanStore.query = "hello"; cleanStore.cycleFilter()
+    assert(cleanStore.filter == .images && cleanStore.query == "hello" && cleanStore.current == nil && cleanStore.selected == nil)
+    cleanStore.cycleFilter()
     assert(cleanStore.filter == .text && cleanStore.query == "hello" && cleanStore.current?.id == b.id)
-    cleanStore.cycleFilter(); assert(cleanStore.current == nil && cleanStore.selected == nil)
     cleanStore.resetBrowser(); assert(cleanStore.filter == .all && cleanStore.query.isEmpty && cleanStore.current?.id == b.id)
     assert(cleanStore.clips.count == 1)
     var editedCopy = b; editedCopy.id = UUID(); editedCopy.text = "Edited"; editedCopy.data = ["public.utf8-plain-text": Data("Edited".utf8)]
