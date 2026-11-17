@@ -1,6 +1,7 @@
 import AppKit
 
 func testImageEditing() {
+    testImageToolbarNavigation()
     // A non-square asymmetric fixture catches vertical flips and point/pixel mistakes.
     let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 120, pixelsHigh: 80, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
     for y in 0..<80 { for x in 0..<120 { bitmap.setColor(NSColor(deviceRed: y < 40 ? 1 : 0, green: 0, blue: y < 40 ? 0 : 1, alpha: 1), atX: x, y: y) } }
@@ -100,4 +101,61 @@ func testImageEditing() {
     let decoded = NSBitmapImageRep(data: png)!
     assert(decoded.pixelsWide == 120 && decoded.pixelsHigh == 80)
     print("Passed: image orientation, pixel preservation, crop bounds, rectangle/arrow/text export, undo/reset and PNG round-trip.")
+}
+
+private func testImageToolbarNavigation() {
+    _ = NSApplication.shared
+    let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 44), styleMask: [.borderless], backing: .buffered, defer: false)
+    let toolbar = ImageToolbarView(frame: window.contentView!.bounds)
+    window.contentView = toolbar
+    let draft = ImageDraft()
+    let canvas = ImageCanvasView(frame: .zero)
+    canvas.draft = draft; draft.canvas = canvas
+    toolbar.addSubview(canvas)
+    toolbar.update(draft: draft, back: {}, save: {})
+    func button(_ tag: Int) { assert((window.firstResponder as? NSButton)?.tag == tag) }
+    draft.tool = .crop
+    toolbar.focusDefaultTool(); button(1)
+    assert(draft.tool == .arrow)
+    assert(toolbar.moveFocus(backward: false)); button(2)
+    assert(draft.tool == .rectangle, "First Tab after entering the editor must activate Rectangle")
+    assert(window.makeFirstResponder(canvas)) // Drawing transfers focus to the canvas.
+    assert(toolbar.moveFocus(backward: false)); button(3)
+    assert(draft.tool == .text, "Tab after drawing a rectangle must continue to Text")
+    assert(window.makeFirstResponder(canvas))
+    assert(toolbar.moveFocus(backward: true)); button(2)
+    assert(draft.tool == .rectangle, "Shift+Tab from the canvas must resume from the active tool")
+    assert(toolbar.moveFocus(backward: true)); button(1)
+    assert(toolbar.moveFocus(backward: true)); button(0)
+    assert(toolbar.moveFocus(backward: true)); button(7)
+    assert(toolbar.moveFocus(backward: false)); button(0)
+    for tag in 1...4 {
+        assert(toolbar.moveFocus(backward: false)); button(tag)
+        assert(draft.tool == ImageTool.allCases[tag - 1], "Tab must activate the focused tool")
+    }
+    assert(toolbar.moveFocus(backward: false)); button(6) // Crop hides dropdowns; disabled Undo is skipped.
+    assert(toolbar.moveFocus(backward: true)); button(4)
+    assert(draft.tool == .crop)
+    assert(toolbar.moveFocus(backward: true)); button(3)
+    assert(draft.tool == .text, "Shift+Tab must activate the focused tool")
+    assert(toolbar.moveFocus(backward: false)); button(4)
+    assert(toolbar.moveFocus(backward: false)); button(6)
+    draft.tool = .text
+    toolbar.update(draft: draft, back: {}, save: {})
+    assert(toolbar.moveFocus(backward: true))
+    assert((window.firstResponder as? NSPopUpButton)?.titleOfSelectedItem == "24 pt")
+    assert(toolbar.moveFocus(backward: true))
+    assert((window.firstResponder as? NSPopUpButton)?.titleOfSelectedItem == "Red")
+    assert(toolbar.moveFocus(backward: false))
+    assert((window.firstResponder as? NSPopUpButton)?.titleOfSelectedItem == "24 pt")
+    assert(toolbar.moveFocus(backward: false)); button(6) // Disabled Undo is skipped.
+    draft.tool = .crop
+    toolbar.update(draft: draft, back: {}, save: {})
+    assert(toolbar.moveFocus(backward: true)); button(4) // Hidden dropdowns are skipped.
+    draft.tool = .text
+    toolbar.update(draft: draft, back: {}, save: {})
+    assert(toolbar.moveFocus(backward: false))
+    assert(toolbar.moveFocus(backward: false))
+    assert((window.firstResponder as? NSPopUpButton)?.titleOfSelectedItem == "24 pt")
+    print("Passed: image toolbar forward/backward focus, wraparound, disabled Undo, crop and text controls.")
 }

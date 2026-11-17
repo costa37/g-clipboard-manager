@@ -85,6 +85,7 @@ final class ImageDraft: ObservableObject {
     var undoImages: [CGImage] { history.map(\.image) }
     private var original: CGImage?
     weak var canvas: ImageCanvasView?
+    weak var toolbar: ImageToolbarView?
     var selectedMark: ImageMark? { marks.first { $0.id == selected } }
     func load(_ source: NSImage?) {
         var rect = CGRect(origin: .zero, size: source?.size ?? .zero)
@@ -143,7 +144,18 @@ final class ImageDraft: ObservableObject {
 struct ImageCanvas: NSViewRepresentable {
     @ObservedObject var draft: ImageDraft
     var editable = true
-    func makeNSView(context: Context) -> ImageCanvasView { let view = ImageCanvasView(); view.draft = draft; view.editable = editable; draft.canvas = view; return view }
+    func makeNSView(context: Context) -> ImageCanvasView {
+        let view = ImageCanvasView(); view.draft = draft; view.editable = editable; draft.canvas = view
+        if editable {
+            // Start on Arrow so the first Tab advances to Rectangle.
+            DispatchQueue.main.async { [weak view] in
+                guard let view, view.editable, let window = view.window,
+                      let toolbar = view.draft.toolbar, toolbar.window === window else { return }
+                toolbar.focusDefaultTool()
+            }
+        }
+        return view
+    }
     func updateNSView(_ view: ImageCanvasView, context: Context) { view.draft = draft; view.editable = editable; draft.canvas = view; view.refresh() }
     static func dismantleNSView(_ view: ImageCanvasView, coordinator: ()) { view.finishText(); if view.draft.canvas === view { view.draft.canvas = nil } }
 }
@@ -163,45 +175,13 @@ struct ImageControlStyle: ButtonStyle {
 }
 
 struct ImageEditor: View {
-    @Environment(\.colorScheme) private var scheme
-    private var controlColor: Color { scheme == .dark ? Color(white: 0.95) : Color(white: 0.12) }
     @ObservedObject var draft: ImageDraft
     var back: () -> Void
     var save: () -> Void
-    private func symbol(_ tool: ImageTool) -> String {
-        switch tool { case .arrow: return "arrow.up.right"; case .rectangle: return "rectangle"; case .text: return "textformat"; case .crop: return "crop" }
-    }
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                Button(action: back) { Image(systemName: "chevron.left").font(.system(size: 17, weight: .medium)).frame(width: 32, height: 32) }.help("Back to preview (Escape)").accessibilityLabel("Back to preview")
-                Divider().frame(height: 18)
-                ForEach(ImageTool.allCases, id: \.self) { tool in
-                    Button { draft.selectTool(tool) } label: {
-                        Image(systemName: symbol(tool)).font(.system(size: 18, weight: .medium)).frame(width: 34, height: 32)
-                            .background(draft.tool == tool ? Color(red: 0.16, green: 0.43, blue: 0.46) : .clear, in: RoundedRectangle(cornerRadius: 4))
-                    }.help(tool == .crop ? "Crop: drag to keep an area" : tool.rawValue)
-                        .accessibilityLabel(tool.rawValue).accessibilityAddTraits(draft.tool == tool ? .isSelected : [])
-                }
-                Divider().frame(height: 18)
-                if draft.tool != .crop {
-                    Menu {
-                        ForEach(Ink.allCases, id: \.self) { ink in
-                            Button { draft.ink = ink; draft.changeStyle() } label: { Label(ink.rawValue, systemImage: draft.ink == ink ? "checkmark.circle.fill" : "circle") }
-                        }
-                    } label: { Text(draft.ink.rawValue).foregroundStyle(controlColor) }
-                    .menuStyle(.borderlessButton).tint(controlColor).foregroundStyle(controlColor).frame(width: 55).help("Color: \(draft.ink.rawValue)").accessibilityLabel("Annotation color: \(draft.ink.rawValue)")
-                    if draft.tool == .text {
-                        Picker("Text size", selection: $draft.fontSize) { ForEach([CGFloat(12), 18, 24, 32, 42, 54, 64], id: \.self) { Text("\(Int($0)) pt").tag($0) } }.labelsHidden().tint(controlColor).foregroundStyle(controlColor).frame(width: 66).onChange(of: draft.fontSize) { _ in draft.changeStyle() }
-                    } else {
-                        Picker("Stroke", selection: $draft.width) { Text("Thin").tag(CGFloat(2)); Text("Medium").tag(CGFloat(4)); Text("Thick").tag(CGFloat(8)) }.labelsHidden().tint(controlColor).foregroundStyle(controlColor).frame(width: 74).onChange(of: draft.width) { _ in draft.changeStyle() }.help("Stroke width")
-                    }
-                }
-                Spacer(minLength: 0)
-                Button { draft.undo() } label: { Image(systemName: "arrow.uturn.backward").font(.system(size: 17, weight: .medium)).frame(width: 32, height: 32) }.disabled(draft.history.isEmpty).help("Undo (⌘Z)").accessibilityLabel("Undo")
-                Button { draft.reset() } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 17, weight: .medium)).frame(width: 32, height: 32) }.help("Reset to original image").accessibilityLabel("Reset image")
-                Button(action: save) { Label("Save", systemImage: "checkmark") }.buttonStyle(.borderedProminent).help("Save edited image as a new item (⌘S)")
-            }.buttonStyle(ImageControlStyle()).controlSize(.regular).font(.system(size: 13)).padding(.horizontal, 8).padding(.vertical, 6)
+            ImageToolbar(draft: draft, back: back, save: save)
+                .frame(height: 44).padding(.horizontal, 8)
             Divider()
             ImageCanvas(draft: draft).frame(maxWidth: .infinity, maxHeight: .infinity)
         }

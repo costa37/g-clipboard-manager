@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.21 — Image editor keyboard navigation
+
+- Navigate the image toolbar with Tab and Shift+Tab, activating drawing tools as they receive focus.
+- Start editing on Arrow and continue from the active tool after drawing on the canvas.
+- Open dropdowns with arrow keys and select with Enter; skip hidden and disabled controls.
+- Move Exit editing to the right side and use a single active-tool highlight without an extra focus frame.
+
 ## 0.3.20 — Images first in search filters
 
 - Cycle search filters through All, Images, then Text with Tab; Shift+Tab reverses the order.

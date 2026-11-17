@@ -596,6 +596,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, SPUS
             if event.keyCode == 53 { if self.store.editing?.isImage == true && self.store.imageDraft.escape() { return nil }; if self.store.editing != nil { self.store.editing = nil } else { self.dismissAndRestoreFocus() }; return nil }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             if self.store.editing != nil {
+                if self.store.editing?.isImage == true,
+                   !(textResponder?.isEditable ?? false),
+                   flags.intersection([.command, .control, .option]).isEmpty,
+                   event.keyCode == 48,
+                   self.store.imageDraft.toolbar?.moveFocus(backward: flags.contains(.shift)) == true { return nil }
                 if self.store.editing?.isImage == true && !(textResponder?.isEditable ?? false) && flags.intersection([.command, .control, .option, .shift]) == .command && event.charactersIgnoringModifiers?.lowercased() == "z" { self.store.imageDraft.undo(); return nil }
                 if flags.intersection([.command, .control, .option, .shift]) == .command && event.charactersIgnoringModifiers?.lowercased() == "s" { self.store.saveEdited(); return nil }
                 return event
